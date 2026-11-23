@@ -61,6 +61,17 @@ INIT_TIMES_LOCAL = [
 PLOT_START_LOCAL = "2026-11-18 09:00"
 PLOT_END_LOCAL = "2026-11-19 12:00"
 
+# NWS alerts drawn as vertical lines on the forecast plots:
+# the local time each took effect, and its line style (both lines are blue)
+NWS_ALERTS = {
+    "Flood Watch": ("2026-11-18 15:00", "--"),
+    "Flash Flood Warning": ("2026-11-18 22:43", "-"),
+}
+ALERT_LINE = {"color": "blue", "linewidth": 3, "alpha": 0.4}
+
+# Reaches whose plots show the alerts (Paso Robles is too far away)
+ALERT_REACHES = [8193611, 8193637, 8192679, 8192681]
+
 # Short-range forecast lead hours (CONUS, 18-hours, hourly)
 LEAD_HOURS = range(1, 19)
 
@@ -720,6 +731,29 @@ for feature_id, name in REACHES.items():
                 linestyle=next(stage_styles),
             )
             labels.append(f"Observed stage,\n{gauge_name} ({gauge})")
+
+    # NWS alerts: a vertical line on both panels at the time each took effect,
+    # named beside the line at the top of the streamflow panel
+    alerts = NWS_ALERTS if feature_id in ALERT_REACHES else {}
+    for alert, (alert_start, linestyle) in alerts.items():
+        alert_start = pd.Timestamp(alert_start)
+        ax_rain.axvline(alert_start, linestyle=linestyle, **ALERT_LINE)
+        ax_flow.axvline(alert_start, linestyle=linestyle, **ALERT_LINE)
+        ax_flow.annotate(
+            f"{alert}, {alert_start:%I:%M %p}",
+            xy=(alert_start, 1),  # at the line, top of the panel
+            xycoords=("data", "axes fraction"),
+            xytext=(4, -4),
+            textcoords="offset points",
+            va="top",
+            color=ALERT_LINE["color"],
+            fontsize="small",
+        )
+    if alerts:
+        # Headroom above the hydrographs, so the names never sit on the curves
+        for ax in filter(None, (ax_flow, ax_stage)):
+            bottom, top = ax.get_ylim()
+            ax.set_ylim(bottom, top + 0.1 * (top - bottom))
 
     ax_flow.set_xlabel("Local time (PST)")
     ax_flow.set_xlim(left=plot_start, right=plot_end)  # the rain panel shares this axis
